@@ -52,6 +52,7 @@
   .login input{width:100%;margin-bottom:10px}
   .login button{width:100%}
   .credit{text-align:center;color:#9ca3af;font-size:11px;letter-spacing:.3px;margin:18px 0 6px;text-transform:uppercase}
+  #liveImg{max-width:100%;border:1px solid #d1d5db;border-radius:8px;background:#111;display:block;margin-top:10px;min-height:60px}
   .hidden{display:none!important}
   @media (max-width:560px){.steps{grid-template-columns:repeat(2,1fr)} .wrap{padding:10px}}
 </style>
@@ -116,6 +117,16 @@
       <button class="orange" id="btnRetry">Retry failed</button>
       <button class="red" id="btnClose">Close browser</button>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>Live view of the PC browser</h2>
+    <div class="row">
+      <button class="primary" id="btnLive">Turn on live view</button>
+      <span class="hint" id="liveState" style="margin:0">Off — nothing is being sent from the PC.</span>
+    </div>
+    <img id="liveImg" class="hidden" alt="Live view">
+    <div class="hint" id="liveNote"></div>
   </div>
 
   <div class="steps">
@@ -293,6 +304,43 @@
       });
     });
   }
+
+  // ------------------------------------------------------- live view
+  // While ON, this page refreshes liveReq/ts every 12 s; the PC sends
+  // screenshots only while that keeps changing. OFF = the PC sends nothing.
+  var liveOn = false, liveBeat = null, liveStop = null, liveAge = null, liveTs = 0;
+  function liveRender(v) {
+    var img = $('liveImg');
+    if (v && v.image) { img.src = v.image; img.classList.remove('hidden'); }
+    else { img.classList.add('hidden'); }
+    $('liveNote').textContent = v && v.note ? v.note : '';
+    liveTs = v && v.ts ? v.ts : 0;
+  }
+  function liveStart() {
+    liveOn = true;
+    $('btnLive').textContent = 'Turn off live view'; $('btnLive').className = 'red';
+    $('liveState').textContent = 'On — waiting for the first picture…';
+    var ping = function () { db.ref('liveReq').set({ ts: firebase.database.ServerValue.TIMESTAMP }); };
+    ping(); liveBeat = setInterval(ping, 12000);
+    db.ref('live').on('value', function (s) { liveRender(s.val()); });
+    liveAge = setInterval(function () {
+      if (!liveTs) return;
+      var a = Math.max(0, Math.round((Date.now() + offset - liveTs) / 1000));
+      $('liveState').textContent = 'On — updated ' + a + 's ago (auto-off after 15 min)';
+    }, 1000);
+    liveStop = setTimeout(function () { liveEnd(); toast('Live view switched off automatically after 15 minutes.'); }, 15 * 60 * 1000);
+  }
+  function liveEnd() {
+    liveOn = false;
+    clearInterval(liveBeat); clearInterval(liveAge); clearTimeout(liveStop);
+    db.ref('live').off();
+    db.ref('liveReq').remove();
+    $('btnLive').textContent = 'Turn on live view'; $('btnLive').className = 'primary';
+    $('liveState').textContent = 'Off — nothing is being sent from the PC.';
+    $('liveImg').classList.add('hidden'); $('liveImg').removeAttribute('src'); $('liveNote').textContent = ''; liveTs = 0;
+  }
+  $('btnLive').onclick = function () { liveOn ? liveEnd() : liveStart(); };
+  window.addEventListener('pagehide', function () { if (liveOn) { try { db.ref('liveReq').remove(); } catch (e) {} } });
 
   // ------------------------------------------------------- commands
   function send(type, args) {

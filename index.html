@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rescue CFMP Remote</title>
+<style>
+  :root{
+    --bg:#f3f4f6; --card:#ffffff; --text:#111827; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#2563eb; --ok:#15803d; --okbg:#dcfce7; --warn:#b45309; --warnbg:#fef3c7;
+    --bad:#b91c1c; --badbg:#fee2e2; --info:#1d4ed8; --infobg:#dbeafe; --log:#87B5C5; --logtext:#0f2733;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:16px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  h1{font-size:20px;margin:0}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:13px;font-weight:600}
+  .badge i{width:9px;height:9px;border-radius:50%;background:currentColor;display:inline-block}
+  .on{background:var(--okbg);color:var(--ok)} .off{background:var(--badbg);color:var(--bad)} .unk{background:var(--line);color:var(--muted)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:15px;margin:0 0 12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  label.chk{display:flex;gap:8px;align-items:center;font-size:14px}
+  input[type=date],input[type=text],input[type=email],input[type=password]{
+    padding:9px 10px;border:1px solid #d1d5db;border-radius:8px;font:inherit;background:#fff;min-width:0}
+  input:disabled{background:#f3f4f6;color:#9ca3af}
+  button{padding:10px 16px;border:0;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;background:#e5e7eb;color:var(--text)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .primary{background:var(--accent);color:#fff} .amber{background:#f59e0b;color:#fff} .green{background:#22c55e;color:#fff}
+  .red{background:#ef4444;color:#fff} .orange{background:#f97316;color:#fff}
+  .hint{color:var(--muted);font-size:13px;margin-top:8px}
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+  .step{padding:10px 6px;text-align:center;font-size:13px;font-weight:700;border-radius:8px;background:var(--line);color:var(--muted)}
+  .step.active{background:var(--infobg);color:var(--info)} .step.done{background:var(--okbg);color:var(--ok)} .step.failed{background:var(--badbg);color:var(--bad)}
+  .bar{height:14px;background:var(--line);border-radius:7px;overflow:hidden}
+  .bar>div{height:100%;width:0;background:#22c55e;transition:width .4s}
+  .meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:13px;color:#374151}
+  .msg{margin-top:8px;font-size:14px}
+  .msg.err{color:var(--bad)}
+  #log{background:var(--log);color:var(--logtext);font:12px/1.5 Consolas,Menlo,monospace;border-radius:8px;padding:10px;height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+  .alert{border-color:#f59e0b;background:var(--warnbg)}
+  .alert img{max-width:100%;border:1px solid #d1d5db;border-radius:8px;background:#fff;display:block;margin:6px 0 10px}
+  .alert input[type=text]{font-size:18px;letter-spacing:2px;width:100%;max-width:260px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  .num{text-align:center}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:90vw;z-index:50}
+  .toast.show{opacity:1}
+  .login{max-width:360px;margin:60px auto}
+  .login input{width:100%;margin-bottom:10px}
+  .login button{width:100%}
+  .credit{text-align:center;color:#9ca3af;font-size:11px;letter-spacing:.3px;margin:18px 0 6px;text-transform:uppercase}
+  .hidden{display:none!important}
+  @media (max-width:560px){.steps{grid-template-columns:repeat(2,1fr)} .wrap{padding:10px}}
+</style>
+</head>
+<body>
+
+<div id="setup" class="wrap hidden">
+  <div class="card"><h2>Setup needed</h2>
+    <p>Open <b>config.js</b> and paste your Firebase web-app settings, then reload this page. See <b>REMOTE_SETUP.md</b>, step 5.</p>
+  </div>
+</div>
+
+<div id="loginView" class="wrap hidden">
+  <div class="login card">
+    <h2>Rescue CFMP Remote</h2>
+    <input id="email" type="email" placeholder="Email" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="primary" id="signInBtn">Sign in</button>
+    <div id="loginErr" class="msg err"></div>
+  </div>
+</div>
+
+<div id="appView" class="wrap hidden">
+  <header>
+    <h1>Rescue CFMP Remote</h1>
+    <div class="row">
+      <span id="pcBadge" class="badge unk"><i></i><span id="pcText">Checking PC…</span></span>
+      <button id="signOutBtn" style="padding:6px 12px;font-size:13px">Sign out</button>
+    </div>
+  </header>
+
+  <div id="captchaCard" class="card alert hidden">
+    <h2>CAPTCHA needed — <span id="capSite"></span></h2>
+    <div id="capNote" class="hint" style="margin:0 0 4px"></div>
+    <img id="capImg" alt="CAPTCHA">
+    <div class="row">
+      <input id="capText" type="text" placeholder="Type CAPTCHA" autocomplete="off" autocapitalize="off">
+      <button class="primary" id="capSubmit">Submit</button>
+      <button id="capRefresh">Refresh image</button>
+    </div>
+    <div id="capState" class="hint"></div>
+  </div>
+
+  <div id="promptCard" class="card alert hidden">
+    <h2>Action needed on the PC</h2>
+    <p id="promptText" style="white-space:pre-wrap;margin:0 0 10px"></p>
+    <button class="primary" id="promptDone">Done</button>
+  </div>
+
+  <div class="card">
+    <h2>Run</h2>
+    <label class="chk"><input type="checkbox" id="useRange"> Use a specific date range</label>
+    <div class="row" style="margin-top:10px">
+      <label>From <input type="date" id="fromDate" disabled></label>
+      <label>To <input type="date" id="toDate" disabled></label>
+    </div>
+    <div class="hint" id="rangeHint">Leave unchecked to use yesterday's report.</div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="btnStart">Start</button>
+      <button class="amber" id="btnPause">Pause</button>
+      <button class="green" id="btnPlay">Play</button>
+      <button class="orange" id="btnRetry">Retry failed</button>
+      <button class="red" id="btnClose">Close browser</button>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step" data-step="download">1. Download</div>
+    <div class="step" data-step="process">2. Process</div>
+    <div class="step" data-step="login">3. CFMP login</div>
+    <div class="step" data-step="submit">4. Submitting</div>
+  </div>
+
+  <div class="card">
+    <div class="bar"><div id="barFill"></div></div>
+    <div class="meta"><span id="counts">Not started yet</span><span id="times"></span></div>
+    <div class="msg" id="statusMsg"></div>
+  </div>
+
+  <div class="card"><h2>Live log</h2><div id="log"></div></div>
+
+  <div class="card">
+    <h2>History</h2>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>When</th><th>Report</th><th class="num">Submitted</th><th class="num">Skipped</th><th class="num">Failed</th><th>Failed EC Nos</th></tr></thead>
+      <tbody id="histBody"><tr><td colspan="6" class="hint">No runs yet.</td></tr></tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="credit">SHAHID JAMIL CO RAHIM YAR KHAN &nbsp;+92 301 763 1541</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var show = function (id, on) { $(id).classList.toggle('hidden', !on); };
+
+  var cfg = window.FIREBASE_CONFIG;
+  if (!cfg || !cfg.apiKey || cfg.apiKey.indexOf('PASTE') === 0) { show('setup', true); return; }
+
+  firebase.initializeApp(cfg);
+  var auth = firebase.auth();
+  var db = firebase.database();
+
+  var offset = 0, agent = {}, status = {}, capId = null, lastCmdId = null, listening = false;
+
+  function toast(t) {
+    var el = $('toast'); el.textContent = t; el.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { el.classList.remove('show'); }, 3200);
+  }
+
+  // ---------------------------------------------------------- auth
+  $('signInBtn').onclick = function () {
+    $('loginErr').textContent = '';
+    auth.signInWithEmailAndPassword($('email').value.trim(), $('password').value)
+      .catch(function (e) { $('loginErr').textContent = 'Sign-in failed: ' + (e.message || e.code); });
+  };
+  $('password').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('signInBtn').click(); });
+  $('signOutBtn').onclick = function () { auth.signOut(); };
+
+  auth.onAuthStateChanged(function (user) {
+    show('loginView', !user); show('appView', !!user);
+    if (user && !listening) { listening = true; startListening(); }
+  });
+
+  // ------------------------------------------------------- helpers
+  function fmt(sec) {
+    if (sec === null || sec === undefined || isNaN(sec)) return 'calculating…';
+    sec = Math.max(0, Math.round(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+    return h ? h + 'h ' + m + 'm' : (m ? m + 'm ' + s + 's' : s + 's');
+  }
+  function pcOnline() {
+    return agent.heartbeat && (Date.now() + offset - agent.heartbeat) < 45000;
+  }
+
+  // ------------------------------------------------------ rendering
+  function renderPc() {
+    var on = pcOnline(), b = $('pcBadge');
+    b.className = 'badge ' + (agent.heartbeat === undefined ? 'unk' : (on ? 'on' : 'off'));
+    $('pcText').textContent = agent.heartbeat === undefined ? 'Waiting for PC…'
+      : (on ? 'PC online' : 'PC offline — last seen ' + new Date(agent.heartbeat).toLocaleString());
+    renderButtons();
+  }
+
+  function renderButtons() {
+    var on = pcOnline(), st = status.state || 'idle';
+    $('btnStart').disabled = !(on && (st === 'idle' || st === 'error'));
+    $('btnPause').disabled = !(on && st === 'running');
+    $('btnPlay').disabled = !(on && st === 'paused');
+    $('btnRetry').disabled = !(on && st === 'finished' && (status.failedRetryable || 0) > 0);
+    $('btnClose').disabled = !(on && st !== 'idle');
+    $('btnClose').textContent = (st === 'running' || st === 'paused') ? 'Cancel run' : 'Close browser';
+  }
+
+  function renderStatus() {
+    var steps = status.stepStates || {};
+    document.querySelectorAll('.step').forEach(function (el) {
+      el.className = 'step ' + (steps[el.getAttribute('data-step')] || '').replace('pending', '');
+    });
+    var total = status.total || 0, done = status.done || 0;
+    $('barFill').style.width = (total ? Math.min(100, done / total * 100) : 0) + '%';
+    $('counts').textContent = total ? (done + ' / ' + total + ' entries · ' + (total - done) + ' left') : 'Not started yet';
+    $('times').textContent = total ? (fmt(status.elapsed) + ' elapsed · ' + (status.finished ? 'done' : fmt(status.remaining) + ' left')) : '';
+    var m = $('statusMsg'); m.textContent = status.message || '';
+    m.className = 'msg' + (status.state === 'error' ? ' err' : '');
+    renderButtons();
+  }
+
+  // ------------------------------------------------------ listeners
+  function startListening() {
+    db.ref('.info/serverTimeOffset').on('value', function (s) { offset = s.val() || 0; renderPc(); });
+    db.ref('agent').on('value', function (s) { agent = s.val() || {}; renderPc(); });
+    setInterval(renderPc, 10000);
+    db.ref('status').on('value', function (s) { status = s.val() || {}; renderStatus(); });
+
+    db.ref('log').on('value', function (s) {
+      var v = s.val(), el = $('log');
+      var stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+      el.textContent = v && v.lines ? v.lines.join('\n') : '';
+      if (stick) el.scrollTop = el.scrollHeight;
+    });
+
+    db.ref('captcha').on('value', function (s) {
+      var v = s.val();
+      if (!v) { capId = null; show('captchaCard', false); return; }
+      if (v.id !== capId) {
+        capId = v.id; $('capText').value = ''; $('capState').textContent = '';
+        $('capImg').src = v.image || '';
+        $('capSite').textContent = v.site || '';
+        $('capNote').textContent = (v.kind === 'screen' ? 'Could not isolate the CAPTCHA, so this is the whole browser view. ' : '') + (v.note || '');
+        show('captchaCard', true);
+        setTimeout(function () { $('capText').focus(); }, 50);
+      }
+    });
+    $('capSubmit').onclick = function () {
+      var t = $('capText').value.trim(); if (!t || !capId) return;
+      db.ref('captchaAnswer').set({ id: capId, text: t });
+      $('capState').textContent = 'Submitted — the PC is entering it now…';
+    };
+    $('capText').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('capSubmit').click(); });
+    $('capRefresh').onclick = function () { db.ref('captchaRefresh').set(Date.now()); $('capState').textContent = 'Refreshing…'; };
+
+    db.ref('prompt').on('value', function (s) {
+      var v = s.val();
+      show('promptCard', !!v);
+      if (v) { $('promptText').textContent = v.message || ''; $('promptDone').onclick = function () { db.ref('promptAnswer').set({ id: v.id }); }; }
+    });
+
+    db.ref('commandAck').on('value', function (s) {
+      var v = s.val();
+      if (v && v.id && v.id === lastCmdId) { toast((v.ok ? '' : 'Not done: ') + (v.message || '')); lastCmdId = null; }
+    });
+
+    db.ref('history').orderByKey().limitToLast(30).on('value', function (s) {
+      var rows = [];
+      s.forEach(function (c) { rows.push(c.val()); });
+      rows.reverse();
+      var body = $('histBody'); body.textContent = '';
+      if (!rows.length) { body.innerHTML = '<tr><td colspan="6" class="hint">No runs yet.</td></tr>'; return; }
+      rows.forEach(function (r) {
+        var tr = document.createElement('tr');
+        var cells = [r.startedAt ? new Date(r.startedAt).toLocaleString() : '', r.label || '',
+                     r.submitted || 0, r.skipped || 0, r.failed || 0, (r.failedEcs || []).join(', ')];
+        cells.forEach(function (c, i) {
+          var td = document.createElement('td'); td.textContent = c;
+          if (i >= 2 && i <= 4) td.className = 'num';
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    });
+  }
+
+  // ------------------------------------------------------- commands
+  function send(type, args) {
+    lastCmdId = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    return db.ref('command').set({ id: lastCmdId, type: type, args: args || {}, ts: firebase.database.ServerValue.TIMESTAMP })
+      .catch(function (e) { toast('Could not send: ' + e.message); });
+  }
+
+  var today = new Date(); var y = new Date(Date.now() - 86400000);
+  function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  $('fromDate').value = iso(y); $('toDate').value = iso(y);
+  $('fromDate').max = iso(today); $('toDate').max = iso(today);
+  $('useRange').onchange = function () {
+    var on = $('useRange').checked;
+    $('fromDate').disabled = !on; $('toDate').disabled = !on;
+    $('rangeHint').textContent = on ? 'The whole range From → To will be downloaded and entered.' : "Leave unchecked to use yesterday's report.";
+  };
+
+  $('btnStart').onclick = function () {
+    var args = {};
+    if ($('useRange').checked) {
+      if (!$('fromDate').value || !$('toDate').value) { toast('Pick both From and To dates.'); return; }
+      args = { from: $('fromDate').value, to: $('toDate').value };
+    }
+    send('start', args);
+  };
+  $('btnPause').onclick = function () { send('pause'); };
+  $('btnPlay').onclick = function () { send('play'); };
+  $('btnRetry').onclick = function () { send('retry'); };
+  $('btnClose').onclick = function () {
+    var st = status.state;
+    if ((st === 'running' || st === 'paused') && !confirm('Cancel the current run and close the browser?')) return;
+    send('close');
+  };
+})();
+</script>
+</body>
+</html>
